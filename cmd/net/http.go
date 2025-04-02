@@ -1,6 +1,7 @@
 package net
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -8,12 +9,14 @@ import (
 	"sync"
 
 	"github.com/lilendian0x00/xray-knife/v2/pkg"
+	"github.com/lilendian0x00/xray-knife/v2/pkg/xray"
 	"github.com/lilendian0x00/xray-knife/v2/utils"
 	"github.com/lilendian0x00/xray-knife/v2/utils/customlog"
 
 	"github.com/fatih/color"
 	"github.com/gocarina/gocsv"
 	"github.com/spf13/cobra"
+	"github.com/xtls/xray-core/infra/conf"
 )
 
 // Config holds all command configuration options
@@ -143,6 +146,8 @@ func (rp *ResultProcessor) SaveResults(results ConfigResults) error {
 		return rp.saveTxtResults(results)
 	case "csv":
 		return rp.saveCSVResults(results)
+	case "json":
+		return rp.saveJSONResults(results)
 	default:
 		return fmt.Errorf("unsupported output type: %s", rp.config.OutputType)
 	}
@@ -188,6 +193,28 @@ func (rp *ResultProcessor) saveCSVResults(results ConfigResults) error {
 	return nil
 }
 
+func (rp *ResultProcessor) saveJSONResults(results ConfigResults) error {
+	if rp.config.CoreType == "singbox" {
+		//TODO: Not implemented yet
+		return fmt.Errorf("Not implemented: singbox outbound")
+	} else if rp.config.CoreType == "xray" {
+		xray_conf := conf.Config{}
+
+		for _, result := range results {
+			outbound, _ := result.Protocol.(xray.Protocol).BuildOutboundDetourConfig(true)
+			xray_conf.OutboundConfigs = append(xray_conf.OutboundConfigs, *outbound)
+		}
+
+		jsonBytes, _ := json.MarshalIndent(xray_conf, "", "  ")
+
+		if err := utils.WriteIntoFile(rp.config.OutputFile, []byte(jsonBytes)); err != nil {
+			fmt.Errorf("failed to save configs: %v", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("Need to specify the CoreType (-z) for JSON config exports")
+}
+
 // validateConfig validates the configuration options
 func validateConfig(cfg *Config) error {
 	validCores := map[string]bool{"auto": true, "xray": true, "singbox": true}
@@ -195,7 +222,7 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("invalid core type. Available cores: (auto, xray, singbox)")
 	}
 
-	validOutputTypes := map[string]bool{"csv": true, "txt": true}
+	validOutputTypes := map[string]bool{"csv": true, "txt": true, "json": true}
 	if !validOutputTypes[cfg.OutputType] {
 		return fmt.Errorf("bad output format. Allowed formats: txt, csv")
 	}
@@ -324,7 +351,7 @@ func addFlags(cmd *cobra.Command, config *Config) {
 	flags.BoolVarP(&config.GetIPInfo, "rip", "r", false, "Send request to XXXX/cdn-cgi/trace to receive config's IP details")
 	flags.Uint32VarP(&config.SpeedtestAmount, "amount", "a", 10000, "Download and upload amount (KB)")
 	flags.BoolVarP(&config.Verbose, "verbose", "v", false, "Verbose")
-	flags.StringVarP(&config.OutputType, "type", "x", "txt", "Output type (csv, txt)")
+	flags.StringVarP(&config.OutputType, "type", "x", "txt", "Output type (csv, txt, json)")
 	flags.StringVarP(&config.OutputFile, "out", "o", "valid.txt", "Output file for valid config links")
 	flags.BoolVarP(&config.SortedByRealDelay, "sort", "s", true, "Sort config links by their delay (fast to slow)")
 }
