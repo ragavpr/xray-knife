@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/lilendian0x00/xray-knife/v2/pkg"
 	"github.com/lilendian0x00/xray-knife/v2/utils"
@@ -17,6 +16,7 @@ var (
 	readFromSTDIN   bool
 	configLink      string
 	configLinksFile string
+	showFailed      bool
 )
 
 // ParseCmd represents the parse command
@@ -45,22 +45,39 @@ var ParseCmd = &cobra.Command{
 			//fmt.Println(links)
 		}
 
-		d := color.New(color.FgCyan, color.Bold)
+		type FailInfo struct {
+			uri string
+			err string
+		}
+
+		failed_configs := make(map[int]FailInfo)
+
+		fmtInfo := color.New(color.FgCyan, color.Bold)
+		fmtError := color.New(color.FgRed)
 		for i, link := range links {
 			if len(links) > 1 {
-				d.Printf("Config Number: %d", i+1)
+				fmtInfo.Printf("Config Number: %d\n", i+1)
 			}
 
-			fmt.Printf("\n")
 			p, err := core.CreateProtocol(link)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v", err)
-				os.Exit(1)
+				if showFailed {
+					failed_configs[i] = FailInfo{uri: link, err: err.Error()}
+				} else {
+					fmt.Fprintf(os.Stderr, "Skipped on protocol creation: %v", err)
+				}
+				continue
 			}
 
 			fmt.Println(p.DetailsStr())
 
-			time.Sleep(time.Duration(25) * time.Millisecond)
+			// time.Sleep(time.Duration(100) * time.Millisecond)
+		}
+
+		if showFailed {
+			for i, failed := range failed_configs {
+				fmt.Println(fmtInfo.Sprint(i), " | ", fmtError.Sprint(failed.err), " | ", failed.uri)
+			}
 		}
 	},
 }
@@ -69,4 +86,5 @@ func init() {
 	ParseCmd.Flags().BoolVarP(&readFromSTDIN, "stdin", "i", false, "Read config link from the console")
 	ParseCmd.Flags().StringVarP(&configLink, "config", "c", "", "The config link")
 	ParseCmd.Flags().StringVarP(&configLinksFile, "file", "f", "", "Read config links from a file")
+	ParseCmd.Flags().BoolVarP(&showFailed, "show-failed", "", false, "Show failed URIs and their errors in the end")
 }
