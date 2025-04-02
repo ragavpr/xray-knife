@@ -49,16 +49,21 @@ func CoreFactory(coreType CoreType, insecureTLS bool, verbose bool) Core {
 type AutomaticCore struct {
 	xrayCore    *xray.Core
 	singboxCore *singbox.Core
+	forcedCore  string
 }
 
 func (c *AutomaticCore) Name() string {
 	return "Automatic"
 }
 
-func NewAutomaticCore(verbose bool, allowInsecure bool) *AutomaticCore {
+func NewAutomaticCore(verbose bool, allowInsecure bool, forcedCore string) *AutomaticCore {
+	if forcedCore != "singbox" && forcedCore != "xray" {
+		forcedCore = ""
+	}
 	return &AutomaticCore{
 		xrayCore:    xray.NewXrayService(verbose, allowInsecure),
 		singboxCore: singbox.NewSingboxService(verbose, allowInsecure),
+		forcedCore:  forcedCore,
 	}
 }
 
@@ -80,24 +85,22 @@ func (c *AutomaticCore) CreateProtocol(configLink string) (protocol.Protocol, er
 		return nil, err
 	}
 
-	coreType, ok := cproto[uri.Scheme]
-	if !ok {
-		return nil, fmt.Errorf("invalid %s protocol", coreType)
-	}
-
-	if coreType == "" {
-		return nil, errors.New("unsupported protocol")
+	if c.forcedCore == "" {
+		supportedCore, ok := cproto[uri.Scheme]
+		if !ok {
+			return nil, fmt.Errorf("invalid %s protocol", supportedCore)
+		}
 	}
 
 	var protocol protocol.Protocol
 
-	switch coreType {
+	switch c.forcedCore {
 	case "xray":
 		protocol, err = c.xrayCore.CreateProtocol(configLink)
 	case "singbox":
 		protocol, err = c.singboxCore.CreateProtocol(configLink)
-		// default: // TODO: What?
-		// return c.singboxCore.CreateProtocol(configLink)
+	default:
+		return nil, errors.New("unsupported protocol")
 	}
 	if err != nil {
 		return nil, err
