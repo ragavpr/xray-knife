@@ -82,6 +82,7 @@ var ParseCmd = &cobra.Command{
 			} else {
 				if coreType == "xray" {
 					outbound, _ := p.(xray.Protocol).BuildOutboundDetourConfig(true)
+					outbound.Tag = p.ConvertToGeneralConfig().Remark
 					xray_conf.OutboundConfigs = append(xray_conf.OutboundConfigs, *outbound)
 				} else if coreType == "singbox" {
 					//TODO: Not implemented yet

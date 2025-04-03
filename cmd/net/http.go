@@ -202,6 +202,7 @@ func (rp *ResultProcessor) saveJSONResults(results ConfigResults) error {
 
 		for _, result := range results {
 			outbound, _ := result.Protocol.(xray.Protocol).BuildOutboundDetourConfig(true)
+			outbound.Tag = result.Protocol.ConvertToGeneralConfig().Remark
 			xray_conf.OutboundConfigs = append(xray_conf.OutboundConfigs, *outbound)
 		}
 
